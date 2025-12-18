@@ -1,8 +1,5 @@
 {
   "name": "TrendSetter AI - Automated SEO Blogging",
   "description": "An AI-powered blogging platform that discovers trending topics, generates human-like SEO-friendly content, and optimizes for Google Discover.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone"
-  ]
+  "requestFramePermissions": []
 }
