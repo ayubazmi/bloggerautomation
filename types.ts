@@ -6,6 +6,8 @@ export interface TrendingTopic {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   intent: string;
   searchVolume: string;
+  category: string;
+  trendingSince: string;
 }
 
 export interface GeneratedBlog {

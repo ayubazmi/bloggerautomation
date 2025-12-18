@@ -4,16 +4,28 @@ import { TrendingTopic, GeneratedBlog } from "../types";
 
 const API_KEY = process.env.API_KEY || '';
 
-export const getTrendingTopics = async (): Promise<TrendingTopic[]> => {
+export const getTrendingTopics = async (category: string = 'General'): Promise<TrendingTopic[]> => {
   const ai = new GoogleGenAI({ apiKey: API_KEY });
-  const prompt = `Analyze current global trends for late 2024 and 2025. 
-  Generate a list of 10 trending, easily rankable, SEO-friendly topics across Tech, Gadgets, Health, and Finance.
-  For each topic, provide source (Google, Reddit, etc.), search intent, and ranking difficulty.`;
+  const now = new Date();
+  const currentDate = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  
+  const prompt = `Today is ${currentDate}. Find the absolute LATEST, most fresh trending topics for today and this week in the category: "${category}". 
+  Do NOT provide trends from 2024 or older unless they are peaking precisely today. 
+  Focus on breaking news, recent product launches, viral discussions on X/Reddit, and surging search queries from the last 24-72 hours.
+  
+  Generate a list of 10 trending, easily rankable, SEO-friendly topics.
+  For each topic, provide:
+  - source (Google, Reddit, etc.)
+  - search intent
+  - ranking difficulty (Easy/Medium/Hard)
+  - specific category
+  - "trendingSince" (MUST be a date within the last 7 days from ${currentDate}).`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt,
     config: {
+      tools: [{ googleSearch: {} }],
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.ARRAY,
@@ -26,14 +38,17 @@ export const getTrendingTopics = async (): Promise<TrendingTopic[]> => {
             difficulty: { type: Type.STRING },
             intent: { type: Type.STRING },
             searchVolume: { type: Type.STRING },
+            category: { type: Type.STRING },
+            trendingSince: { type: Type.STRING },
           },
-          required: ["id", "title", "source", "difficulty", "intent", "searchVolume"]
+          required: ["id", "title", "source", "difficulty", "intent", "searchVolume", "category", "trendingSince"]
         }
       }
     }
   });
 
   try {
+    // Note: If using googleSearch, the response.text is still JSON because of responseMimeType
     return JSON.parse(response.text || "[]");
   } catch (e) {
     console.error("Error parsing trends", e);
