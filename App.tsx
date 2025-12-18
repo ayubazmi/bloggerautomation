@@ -19,10 +19,10 @@ const App: React.FC = () => {
     fetchTrends();
   }, []);
 
-  const fetchTrends = async (category: string = 'General') => {
+  const fetchTrends = async (category: string = 'General', keyword?: string) => {
     setLoadingTrends(true);
     try {
-      const data = await getTrendingTopics(category);
+      const data = await getTrendingTopics(category, keyword);
       setTrends(data);
     } catch (error) {
       console.error("Failed to load trends", error);
@@ -142,8 +142,6 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-// --- Icons & Helper Components ---
 
 const NavItem: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string; disabled?: boolean }> = ({ active, onClick, icon, label, disabled }) => (
   <button

@@ -4,22 +4,36 @@ import { TrendingTopic, GeneratedBlog } from "../types";
 
 const API_KEY = process.env.API_KEY || '';
 
-export const getTrendingTopics = async (category: string = 'General'): Promise<TrendingTopic[]> => {
+/**
+ * Fetches the absolute latest trending topics using Google Search grounding.
+ * Strictly filters out old content to ensure only the most recent (last 24-48h) trends appear.
+ */
+export const getTrendingTopics = async (category: string = 'General', keyword?: string): Promise<TrendingTopic[]> => {
   const ai = new GoogleGenAI({ apiKey: API_KEY });
   const now = new Date();
-  const currentDate = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const currentDate = now.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
   
-  const prompt = `Today is ${currentDate}. Find the absolute LATEST, most fresh trending topics for today and this week in the category: "${category}". 
-  Do NOT provide trends from 2024 or older unless they are peaking precisely today. 
-  Focus on breaking news, recent product launches, viral discussions on X/Reddit, and surging search queries from the last 24-72 hours.
+  let searchContext = `the category: "${category}"`;
+  if (keyword && keyword.trim() !== '') {
+    searchContext = `the specific keyword: "${keyword}" (within the ${category} space)`;
+  }
+
+  const prompt = `CRITICAL: Today is ${currentDate}. 
+  Act as a real-time news analyst. Using Google Search, identify exactly 20 of the most viral, surging, and LATEST trending topics for today related to ${searchContext}.
   
-  Generate a list of 10 trending, easily rankable, SEO-friendly topics.
-  For each topic, provide:
-  - source (Google, Reddit, etc.)
-  - search intent
-  - ranking difficulty (Easy/Medium/Hard)
-  - specific category
-  - "trendingSince" (MUST be a date within the last 7 days from ${currentDate}).`;
+  STRICT RULES:
+  1. IGNORE any results from 2024 or earlier. Only 2025 topics are allowed.
+  2. TARGET SOURCES: Prioritize finding trends reported on or discussed in: 9to5google.com, electrek.co, 9to5mac.com, and english.patrikatimes.in, alongside major platforms like Reddit, Twitter, and Google Trends.
+  3. Topics must be "Breaking News," "Fresh Product Launches," or "Viral Social Media Trends" from the last 48 hours.
+  4. Analyze each for SEO potential.
+  
+  Return the list in the specified JSON format.
+  For "source", strictly use one of: 'Google', 'Reddit', 'Twitter', 'Youtube', 'News', '9to5google.com', 'electrek.co', '9to5mac.com', 'english.patrikatimes.in'.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -48,36 +62,41 @@ export const getTrendingTopics = async (category: string = 'General'): Promise<T
   });
 
   try {
-    // Note: If using googleSearch, the response.text is still JSON because of responseMimeType
-    return JSON.parse(response.text || "[]");
+    const text = response.text;
+    if (!text) return [];
+    return JSON.parse(text);
   } catch (e) {
-    console.error("Error parsing trends", e);
+    console.error("Error parsing trends response", e);
     return [];
   }
 };
 
+/**
+ * Generates human-like, SEO-optimized blog content for a specific topic.
+ */
 export const generateBlogContent = async (topic: string): Promise<GeneratedBlog> => {
   const ai = new GoogleGenAI({ apiKey: API_KEY });
   
-  const systemInstruction = `You are a professional human blogger. 
-  WRITING RULES:
-  - 100% human-like tone.
-  - Simple, everyday English.
-  - NO advanced vocabulary like 'Furthermore', 'Moreover', 'In conclusion', 'Delve'.
-  - Short paragraphs (2-3 lines max).
-  - Use the specific style: "In today’s time, whenever a new [Subject] is [Action], the eyes of [Target Audience] are fixed on it."
-  - Natural flow.
-  - Optimized for SEO.
-  - Return the content in structured JSON.`;
+  const systemInstruction = `You are an expert human blogger and SEO specialist.
+  STYLE GUIDE:
+  - Language: Simple, conversational, everyday English. Grade 6-8 reading level.
+  - Tone: Engaging, helpful, and direct.
+  - Structure: Short paragraphs (2-3 sentences max). Clear H2/H3 headers.
+  - NO AI WORDS: Avoid "delve," "moreover," "in conclusion," "comprehensive," "essential," "unleash," "navigate."
+  - Human Touch: Start with a personal-feeling hook.
+  - SEO: Optimize for natural search intent.
+  - Formatting: Use markdown for headers and lists.`;
 
-  const prompt = `Write a comprehensive, engaging blog post about: "${topic}". 
-  Include:
-  1. A catchy SEO Title
-  2. A Meta Description
-  3. A URL Slug
-  4. The main content body
-  5. JSON Article Schema
-  6. Estimated metrics (SEO score, keyword score, readability, AI detection score - target low AI score)`;
+  const prompt = `Topic: "${topic}"
+  Write a high-quality blog post. 
+  Return a JSON object containing:
+  - title: Catchy, emotion-neutral SEO title.
+  - content: Full markdown content body (minimum 600 words).
+  - metaTitle: 50-60 characters SEO title.
+  - metaDescription: 150-160 characters summary.
+  - slug: URL-friendly version of the title.
+  - schema: valid Article JSON-LD schema.
+  - metrics: Object with seoScore, keywordScore, readabilityScore, aiScore (0-100).`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
@@ -111,38 +130,34 @@ export const generateBlogContent = async (topic: string): Promise<GeneratedBlog>
 
   const blogData = JSON.parse(response.text || "{}");
   
-  // Generate 2 images for the blog
+  const images: string[] = [];
   const imagePrompts = [
-    `Realistic, blog-friendly high quality photo for the header of a blog about ${topic}. No text.`,
-    `Realistic, lifestyle photo representing a key point in a blog about ${topic}. No text.`
+    `High resolution realistic lifestyle photography related to ${topic}. Natural lighting, blog header style. No text.`,
+    `Close-up realistic detail shot related to ${topic}. Cinematic lighting, no text.`
   ];
 
-  const images: string[] = [];
-  for (const imgPrompt of imagePrompts) {
-    const imgResponse = await ai.models.generateContent({
+  for (const p of imagePrompts) {
+    const imgResp = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: imgPrompt }] },
+      contents: { parts: [{ text: p }] },
       config: { imageConfig: { aspectRatio: "16:9" } }
     });
-
-    for (const part of imgResponse.candidates[0].content.parts) {
-      if (part.inlineData) {
-        images.push(`data:image/png;base64,${part.inlineData.data}`);
-      }
+    
+    const part = imgResp.candidates[0].content.parts.find(p => p.inlineData);
+    if (part?.inlineData) {
+      images.push(`data:image/png;base64,${part.inlineData.data}`);
     }
   }
 
   return {
     id: Math.random().toString(36).substr(2, 9),
-    title: blogData.title,
-    content: blogData.content,
-    images: images,
+    ...blogData,
+    images,
     seoData: {
       metaTitle: blogData.metaTitle,
       metaDescription: blogData.metaDescription,
       slug: blogData.slug,
       schema: blogData.schema,
-    },
-    metrics: blogData.metrics
+    }
   };
 };
