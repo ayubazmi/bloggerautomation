@@ -41,6 +41,9 @@ const TrendingFeed: React.FC<TrendingFeedProps> = ({ trends, loading, onGenerate
     if (s === 'electrek.co') return 'text-cyan-600 bg-cyan-50 border-cyan-100';
     if (s === '9to5mac.com') return 'text-gray-700 bg-gray-100 border-gray-200';
     if (s === 'english.patrikatimes.in') return 'text-rose-700 bg-rose-50 border-rose-100';
+    if (s === 'the verge') return 'text-white bg-fuchsia-600 border-fuchsia-700 shadow-sm';
+    if (s === 'google news') return 'text-blue-700 bg-blue-100 border-blue-200 font-black';
+    if (s === 'newsbytes') return 'text-indigo-800 bg-indigo-50 border-indigo-100';
     if (s === 'reddit') return 'text-orange-600 bg-orange-50 border-orange-100';
     if (s === 'twitter') return 'text-sky-600 bg-sky-50 border-sky-100';
     return 'text-gray-400 bg-gray-50 border-gray-100';

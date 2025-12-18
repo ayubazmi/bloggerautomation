@@ -2,7 +2,7 @@
 export interface TrendingTopic {
   id: string;
   title: string;
-  source: 'Google' | 'Reddit' | 'Twitter' | 'Youtube' | 'News' | '9to5google.com' | 'electrek.co' | '9to5mac.com' | 'english.patrikatimes.in';
+  source: 'Google' | 'Reddit' | 'Twitter' | 'Youtube' | 'News' | '9to5google.com' | 'electrek.co' | '9to5mac.com' | 'english.patrikatimes.in' | 'Google News' | 'NewsBytes' | 'The Verge';
   difficulty: 'Easy' | 'Medium' | 'Hard';
   intent: string;
   searchVolume: string;

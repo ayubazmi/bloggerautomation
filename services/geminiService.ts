@@ -28,12 +28,12 @@ export const getTrendingTopics = async (category: string = 'General', keyword?: 
   
   STRICT RULES:
   1. IGNORE any results from 2024 or earlier. Only 2025 topics are allowed.
-  2. TARGET SOURCES: Prioritize finding trends reported on or discussed in: 9to5google.com, electrek.co, 9to5mac.com, and english.patrikatimes.in, alongside major platforms like Reddit, Twitter, and Google Trends.
+  2. TARGET SOURCES: Prioritize finding trends reported on or discussed in: The Verge, Google News, NewsBytes, 9to5google.com, electrek.co, 9to5mac.com, and english.patrikatimes.in.
   3. Topics must be "Breaking News," "Fresh Product Launches," or "Viral Social Media Trends" from the last 48 hours.
   4. Analyze each for SEO potential.
   
   Return the list in the specified JSON format.
-  For "source", strictly use one of: 'Google', 'Reddit', 'Twitter', 'Youtube', 'News', '9to5google.com', 'electrek.co', '9to5mac.com', 'english.patrikatimes.in'.`;
+  For "source", strictly use one of: 'Google', 'Reddit', 'Twitter', 'Youtube', 'News', '9to5google.com', 'electrek.co', '9to5mac.com', 'english.patrikatimes.in', 'Google News', 'NewsBytes', 'The Verge'.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
