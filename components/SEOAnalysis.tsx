@@ -7,6 +7,7 @@ interface SEOAnalysisProps {
     keywordScore: number;
     readabilityScore: number;
     aiScore: number;
+    humanScore: number;
   };
   seoData: {
     metaTitle: string;
@@ -36,11 +37,12 @@ const SEOAnalysis: React.FC<SEOAnalysisProps> = ({ metrics, seoData }) => {
       </div>
 
       <div className="p-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
           <ScoreCard label="SEO Score" value={metrics.seoScore} color={getScoreColor(metrics.seoScore)} />
           <ScoreCard label="Keyword Density" value={metrics.keywordScore} color={getScoreColor(metrics.keywordScore)} />
           <ScoreCard label="Readability" value={metrics.readabilityScore} color={getScoreColor(metrics.readabilityScore)} />
           <ScoreCard label="AI Probability" value={metrics.aiScore} color={getScoreColor(metrics.aiScore, true)} sub="Target < 10%" />
+          <ScoreCard label="Human-Likeness" value={metrics.humanScore} color={getScoreColor(metrics.humanScore)} sub="Target > 90%" />
         </div>
 
         <div className="space-y-4">

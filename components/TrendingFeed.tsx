@@ -173,7 +173,7 @@ const TrendingFeed: React.FC<TrendingFeedProps> = ({ trends, loading, onGenerate
       {/* Trends Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {loading ? (
-          Array(8).fill(0).map((_, i) => (
+          Array(12).fill(0).map((_, i) => (
             <div key={i} className="bg-white h-56 rounded-2xl border border-gray-100 animate-pulse overflow-hidden">
                <div className="h-2 bg-gray-50 w-full"></div>
                <div className="p-6 space-y-4">
@@ -196,9 +196,25 @@ const TrendingFeed: React.FC<TrendingFeedProps> = ({ trends, loading, onGenerate
                 <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase border ${difficultyColor(trend.difficulty)}`}>
                   Difficulty: {trend.difficulty}
                 </span>
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border tracking-tighter transition-all ${getSourceStyle(trend.source)}`}>
-                  {trend.source}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase border tracking-tighter transition-all ${getSourceStyle(trend.source)}`}>
+                    {trend.source}
+                  </span>
+                  {trend.sourceUrl && (
+                    <a 
+                      href={trend.sourceUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-gray-400 hover:text-indigo-600 transition-colors p-1 rounded-md hover:bg-indigo-50"
+                      title="Read Original Article"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  )}
+                </div>
               </div>
 
               <h3 className="text-xl font-black text-gray-900 group-hover:text-indigo-600 transition-colors mb-2 leading-tight">

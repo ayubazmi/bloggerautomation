@@ -8,13 +8,22 @@ export interface TrendingTopic {
   searchVolume: string;
   category: string;
   trendingSince: string;
+  sourceUrl: string;
+}
+
+export type BlogStyle = 'News' | 'How-to' | 'Opinion' | 'Listicle' | 'Professional' | 'Conversational' | 'Storytelling' | 'Technical';
+
+export interface BlogImage {
+  url: string;
+  isAiGenerated: boolean;
 }
 
 export interface GeneratedBlog {
   id: string;
   title: string;
   content: string;
-  images: string[];
+  style: BlogStyle;
+  images: BlogImage[];
   seoData: {
     metaTitle: string;
     metaDescription: string;
@@ -26,6 +35,7 @@ export interface GeneratedBlog {
     keywordScore: number;
     readabilityScore: number;
     aiScore: number;
+    humanScore: number;
   };
 }
 

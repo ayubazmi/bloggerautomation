@@ -1,13 +1,9 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { TrendingTopic, GeneratedBlog } from "../types";
+import { TrendingTopic, GeneratedBlog, BlogStyle, BlogImage } from "../types";
 
 const API_KEY = process.env.API_KEY || '';
 
-/**
- * Fetches the absolute latest trending topics using Google Search grounding.
- * Strictly filters out old content to ensure only the most recent (last 24-48h) trends appear.
- */
 export const getTrendingTopics = async (category: string = 'General', keyword?: string): Promise<TrendingTopic[]> => {
   const ai = new GoogleGenAI({ apiKey: API_KEY });
   const now = new Date();
@@ -23,17 +19,16 @@ export const getTrendingTopics = async (category: string = 'General', keyword?: 
     searchContext = `the specific keyword: "${keyword}" (within the ${category} space)`;
   }
 
-  const prompt = `CRITICAL: Today is ${currentDate}. 
-  Act as a real-time news analyst. Using Google Search, identify exactly 20 of the most viral, surging, and LATEST trending topics for today related to ${searchContext}.
+  const prompt = `CRITICAL SYSTEM INSTRUCTION: Today is ${currentDate}. 
+  Act as a real-time news analyst. Using Google Search grounding, identify AT LEAST 30 of the most viral and LATEST trending topics for today related to ${searchContext}.
   
-  STRICT RULES:
-  1. IGNORE any results from 2024 or earlier. Only 2025 topics are allowed.
-  2. TARGET SOURCES: Prioritize finding trends reported on or discussed in: The Verge, Google News, NewsBytes, 9to5google.com, electrek.co, 9to5mac.com, and english.patrikatimes.in.
-  3. Topics must be "Breaking News," "Fresh Product Launches," or "Viral Social Media Trends" from the last 48 hours.
-  4. Analyze each for SEO potential.
+  STRICT URL SELECTION RULES:
+  1. For every topic found, check the "groundingChunks" and metadata in your search results for a direct article link (URI).
+  2. If a specific article URI is found for that topic, you MUST use that exact URI as the "sourceUrl".
+  3. PREFERENCE: A direct link to the article (e.g., on 9to5google.com or theverge.com) is HIGHLY PREFERRED over a search link.
+  4. FALLBACK: Only use a Google News search link (https://www.google.com/search?q=[Topic+Title]+news&tbm=nws) if you absolutely cannot find a direct article URI in the grounding data for that specific topic.
   
-  Return the list in the specified JSON format.
-  For "source", strictly use one of: 'Google', 'Reddit', 'Twitter', 'Youtube', 'News', '9to5google.com', 'electrek.co', '9to5mac.com', 'english.patrikatimes.in', 'Google News', 'NewsBytes', 'The Verge'.`;
+  Return the list in the specified JSON format. Only include news from 2025.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -54,8 +49,9 @@ export const getTrendingTopics = async (category: string = 'General', keyword?: 
             searchVolume: { type: Type.STRING },
             category: { type: Type.STRING },
             trendingSince: { type: Type.STRING },
+            sourceUrl: { type: Type.STRING },
           },
-          required: ["id", "title", "source", "difficulty", "intent", "searchVolume", "category", "trendingSince"]
+          required: ["id", "title", "source", "difficulty", "intent", "searchVolume", "category", "trendingSince", "sourceUrl"]
         }
       }
     }
@@ -71,32 +67,45 @@ export const getTrendingTopics = async (category: string = 'General', keyword?: 
   }
 };
 
-/**
- * Generates human-like, SEO-optimized blog content for a specific topic.
- */
-export const generateBlogContent = async (topic: string): Promise<GeneratedBlog> => {
+export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Promise<GeneratedBlog> => {
   const ai = new GoogleGenAI({ apiKey: API_KEY });
   
+  const styleInstructions: Record<BlogStyle, string> = {
+    'News': 'Write as a factual, breaking news report. Objective tone.',
+    'How-to': 'Write as a step-by-step tutorial. Practical and instructional.',
+    'Opinion': 'Write as an editorial or opinion piece. Persuasive and personal.',
+    'Listicle': 'Write as a "Top X" list. Skimmable with numbered headers.',
+    'Professional': 'Write with a formal, authoritative, corporate tone.',
+    'Conversational': 'Write like a friend talking to a friend. Casual and relatable.',
+    'Storytelling': 'Start with a narrative hook. Use anecdotes.',
+    'Technical': 'Deep dive into specifications and advanced mechanics.'
+  };
+
   const systemInstruction = `You are an expert human blogger and SEO specialist.
-  STYLE GUIDE:
-  - Language: Simple, conversational, everyday English. Grade 6-8 reading level.
-  - Tone: Engaging, helpful, and direct.
-  - Structure: Short paragraphs (2-3 sentences max). Clear H2/H3 headers.
-  - NO AI WORDS: Avoid "delve," "moreover," "in conclusion," "comprehensive," "essential," "unleash," "navigate."
-  - Human Touch: Start with a personal-feeling hook.
-  - SEO: Optimize for natural search intent.
-  - Formatting: Use markdown for headers and lists.`;
+  STYLE: ${styleInstructions[style]}
+  
+  STRICT LENGTH REQUIREMENT:
+  - The article MUST be between 420 and 550 words long. 
+  - DO NOT exceed 550 words. DO NOT fall below 420 words.
+  
+  STRICT CONTENT STRUCTURE:
+  1. H1: Catchy Title.
+  2. Intro: Short punchy paragraph.
+  3. H2: Main Analysis (Approx 150 words).
+  4. H2: Supporting Context/Features (Approx 150 words).
+  5. H3: Specific Deep Dive Detail.
+  6. Bullet points.
+  7. Conclusion: Final verdict (Clearly labeled).
+
+  WRITING RULES:
+  - Language: Simple English. Grade 6-8 reading level.
+  - No AI words: Avoid "delve," "moreover," "unleash," "comprehensive."
+  - Human Touch: High burstiness, varying sentence lengths.
+  - Formatting: Valid Markdown.`;
 
   const prompt = `Topic: "${topic}"
-  Write a high-quality blog post. 
-  Return a JSON object containing:
-  - title: Catchy, emotion-neutral SEO title.
-  - content: Full markdown content body (minimum 600 words).
-  - metaTitle: 50-60 characters SEO title.
-  - metaDescription: 150-160 characters summary.
-  - slug: URL-friendly version of the title.
-  - schema: valid Article JSON-LD schema.
-  - metrics: Object with seoScore, keywordScore, readabilityScore, aiScore (0-100).`;
+  Generate a high-quality blog post (Target: 450 words, Range: 420-550 words) in the ${style} style. 
+  Return JSON: title, content (markdown), metaTitle, metaDescription, slug, schema, metrics.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
@@ -120,7 +129,9 @@ export const generateBlogContent = async (topic: string): Promise<GeneratedBlog>
               keywordScore: { type: Type.NUMBER },
               readabilityScore: { type: Type.NUMBER },
               aiScore: { type: Type.NUMBER },
-            }
+              humanScore: { type: Type.NUMBER },
+            },
+            required: ["seoScore", "keywordScore", "readabilityScore", "aiScore", "humanScore"]
           }
         },
         required: ["title", "content", "metaTitle", "metaDescription", "slug", "schema", "metrics"]
@@ -130,28 +141,33 @@ export const generateBlogContent = async (topic: string): Promise<GeneratedBlog>
 
   const blogData = JSON.parse(response.text || "{}");
   
-  const images: string[] = [];
-  const imagePrompts = [
-    `High resolution realistic lifestyle photography related to ${topic}. Natural lighting, blog header style. No text.`,
-    `Close-up realistic detail shot related to ${topic}. Cinematic lighting, no text.`
-  ];
-
+  const images: BlogImage[] = [];
+  const imagePrompts = [`Realistic photography of ${topic}`, `Detail shot of ${topic}`];
+  
   for (const p of imagePrompts) {
-    const imgResp = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: p }] },
-      config: { imageConfig: { aspectRatio: "16:9" } }
-    });
-    
-    const part = imgResp.candidates[0].content.parts.find(p => p.inlineData);
-    if (part?.inlineData) {
-      images.push(`data:image/png;base64,${part.inlineData.data}`);
+    try {
+      const imgResp = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: { parts: [{ text: p }] },
+        config: { imageConfig: { aspectRatio: "16:9" } }
+      });
+      const part = imgResp.candidates[0].content.parts.find(p => p.inlineData);
+      if (part?.inlineData) {
+        images.push({ url: `data:image/png;base64,${part.inlineData.data}`, isAiGenerated: true });
+      }
+    } catch (e) {
+      console.error("Image generation failed", e);
     }
+  }
+
+  while (images.length < 2) {
+    images.push({ url: `https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&q=80&w=1000`, isAiGenerated: false });
   }
 
   return {
     id: Math.random().toString(36).substr(2, 9),
     ...blogData,
+    style,
     images,
     seoData: {
       metaTitle: blogData.metaTitle,
@@ -160,4 +176,51 @@ export const generateBlogContent = async (topic: string): Promise<GeneratedBlog>
       schema: blogData.schema,
     }
   };
+};
+
+export const extendBlogWithTopic = async (currentBlog: GeneratedBlog, newTopic: string): Promise<GeneratedBlog> => {
+  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  
+  const prompt = `I have a blog about "${currentBlog.title}". Add a section about "${newTopic}".
+  STRICT RULE: The final total article word count MUST NOT exceed 550 words.
+  Integrate the new topic into the existing style. Return full updated markdown.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          updatedContent: { type: Type.STRING },
+          newMetrics: {
+             type: Type.OBJECT,
+             properties: {
+               seoScore: { type: Type.NUMBER },
+               keywordScore: { type: Type.NUMBER },
+               readabilityScore: { type: Type.NUMBER },
+               aiScore: { type: Type.NUMBER },
+               humanScore: { type: Type.NUMBER },
+             },
+             required: ["seoScore", "keywordScore", "readabilityScore", "aiScore", "humanScore"]
+          }
+        },
+        required: ["updatedContent", "newMetrics"]
+      }
+    }
+  });
+
+  const data = JSON.parse(response.text || "{}");
+  
+  return {
+    ...currentBlog,
+    content: data.updatedContent,
+    metrics: data.newMetrics
+  };
+};
+
+export const generateBlogVariations = async (topic: string): Promise<GeneratedBlog[]> => {
+  const styles: BlogStyle[] = ['News', 'How-to', 'Opinion', 'Listicle'];
+  return Promise.all(styles.map(style => generateBlogWithStyle(topic, style)));
 };
