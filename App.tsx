@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { TrendingTopic, GeneratedBlog, BlogStyle } from './types';
-import { getTrendingTopics, generateBlogVariations, generateBlogWithStyle } from './services/geminiService';
+import { getTrendingTopics, generateBlogVariations, generateBlogWithStyle, refineBlogWithPrompt } from './services/geminiService';
 import TrendingFeed from './components/TrendingFeed';
 import BlogEditor from './components/BlogEditor';
 import SEOAnalysis from './components/SEOAnalysis';
@@ -74,6 +74,20 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Failed to rewrite", error);
       alert("Rewrite failed.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleRefineBlog = async (instruction: string) => {
+    if (!currentBlog) return;
+    setGenerating(true);
+    try {
+      const refined = await refineBlogWithPrompt(currentBlog, instruction);
+      setCurrentBlog(refined);
+    } catch (error) {
+      console.error("Failed to refine blog", error);
+      alert("Refinement failed. Please try again.");
     } finally {
       setGenerating(false);
     }
@@ -215,6 +229,7 @@ const App: React.FC = () => {
                 blog={currentBlog} 
                 onUpdate={setCurrentBlog} 
                 onRewrite={handleRewrite}
+                onRefine={handleRefineBlog}
               />
               <div className="mt-8 flex justify-end gap-4 pb-12">
                 <button 
@@ -242,7 +257,7 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'preview' && currentBlog && (
-            <DiscoverPreview blog={currentBlog} />
+            <DiscoverPreview blog={currentBlog} onRefine={handleRefineBlog} />
           )}
         </div>
       </main>

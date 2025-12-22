@@ -2,11 +2,11 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { TrendingTopic, GeneratedBlog, BlogStyle, BlogImage } from "../types";
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
+// Always initialize GoogleGenAI with the apiKey in a named parameter using process.env.API_KEY
+const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getTrendingTopics = async (category: string = 'General', keyword?: string): Promise<TrendingTopic[]> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = getAi();
   const now = new Date();
   const currentDate = now.toLocaleDateString('en-US', { 
     weekday: 'long', 
@@ -27,11 +27,10 @@ export const getTrendingTopics = async (category: string = 'General', keyword?: 
   1. For every topic found, check the "groundingChunks" and metadata in your search results for a direct article link (URI).
   2. If a specific article URI is found for that topic, you MUST use that exact URI as the "sourceUrl".
   3. PREFERENCE: A direct link to the article (e.g., on 9to5google.com or theverge.com) is HIGHLY PREFERRED over a search link.
-  4. FALLBACK: Only use a Google News search link (https://www.google.com/search?q=[Topic+Title]+news&tbm=nws) if you absolutely cannot find a direct article URI in the grounding data for that specific topic.
   
   Return the list in the specified JSON format. Only include news from 2025.`;
 
-  const response = await ai.models.generateContent({
+  const response: GenerateContentResponse = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt,
     config: {
@@ -69,7 +68,7 @@ export const getTrendingTopics = async (category: string = 'General', keyword?: 
 };
 
 export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Promise<GeneratedBlog> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = getAi();
   
   const styleInstructions: Record<BlogStyle, string> = {
     'News': 'Write as a factual, breaking news report. Objective tone.',
@@ -87,7 +86,12 @@ export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Pr
   
   STRICT LENGTH REQUIREMENT:
   - The article MUST be between 420 and 550 words long. 
-  - DO NOT exceed 550 words. DO NOT fall below 420 words.
+  
+  STRICT AUTHENTICITY & MULTI-SOURCE REQUIREMENT:
+  - You MUST use Google Search grounding to find real facts.
+  - CRITICAL: Do NOT rely on a single source or article. 
+  - You MUST synthesize information from AT LEAST 3 to 5 distinct web references to provide a comprehensive and verified perspective.
+  - Cross-check technical specs, dates, and quotes across multiple sources to ensure 100% accuracy.
   
   STRICT CONTENT STRUCTURE:
   1. H1: Catchy Title.
@@ -105,14 +109,16 @@ export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Pr
   - Formatting: Valid Markdown.`;
 
   const prompt = `Topic: "${topic}"
-  Generate a high-quality blog post (Target: 450 words, Range: 420-550 words) in the ${style} style. 
+  Generate a high-quality blog post (Target: 450 words) in the ${style} style. 
+  Base the content on a synthesis of AT LEAST 3-5 real web sources discovered via search.
   Return JSON: title, content (markdown), metaTitle, metaDescription, slug, schema, metrics.`;
 
-  const response = await ai.models.generateContent({
+  const response: GenerateContentResponse = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
     contents: prompt,
     config: {
       systemInstruction,
+      tools: [{ googleSearch: {} }],
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -142,6 +148,17 @@ export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Pr
 
   const blogData = JSON.parse(response.text || "{}");
   
+  // Extract ALL unique references from grounding metadata to show multi-source authenticity
+  const references: string[] = [];
+  const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+  if (groundingChunks) {
+    groundingChunks.forEach((chunk: any) => {
+      if (chunk.web?.uri && !references.includes(chunk.web.uri)) {
+        references.push(chunk.web.uri);
+      }
+    });
+  }
+  
   const images: BlogImage[] = [];
   const imagePrompts = [`Realistic photography of ${topic}`, `Detail shot of ${topic}`];
   
@@ -152,7 +169,7 @@ export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Pr
         contents: { parts: [{ text: p }] },
         config: { imageConfig: { aspectRatio: "16:9" } }
       });
-      const part = imgResp.candidates[0].content.parts.find(p => p.inlineData);
+      const part = imgResp.candidates?.[0]?.content?.parts.find(p => p.inlineData);
       if (part?.inlineData) {
         images.push({ url: `data:image/png;base64,${part.inlineData.data}`, isAiGenerated: true });
       }
@@ -170,6 +187,7 @@ export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Pr
     ...blogData,
     style,
     images,
+    references,
     seoData: {
       metaTitle: blogData.metaTitle,
       metaDescription: blogData.metaDescription,
@@ -179,8 +197,82 @@ export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Pr
   };
 };
 
+export const refineBlogWithPrompt = async (currentBlog: GeneratedBlog, userInstruction: string): Promise<GeneratedBlog> => {
+  const ai = getAi();
+  
+  const prompt = `Act as an expert editor. I have an existing blog post about "${currentBlog.title}". 
+  The user wants to refine it with the following instruction: "${userInstruction}".
+  
+  STRICT RULES:
+  1. Maintain the existing style and word count (Target: 450-550 words).
+  2. Incorporate the new information or change requested naturally.
+  3. Update the metrics based on the new content.
+  4. If the instruction requires new facts, use Google Search grounding.
+
+  Return the updated blog data in the exact JSON format.`;
+
+  const response: GenerateContentResponse = await ai.models.generateContent({
+    model: "gemini-3-pro-preview",
+    contents: [
+      { text: `Current Title: ${currentBlog.title}` },
+      { text: `Current Content: ${currentBlog.content}` },
+      { text: `User Instruction: ${userInstruction}` }
+    ],
+    config: {
+      tools: [{ googleSearch: {} }],
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          content: { type: Type.STRING },
+          metaTitle: { type: Type.STRING },
+          metaDescription: { type: Type.STRING },
+          slug: { type: Type.STRING },
+          metrics: {
+            type: Type.OBJECT,
+            properties: {
+              seoScore: { type: Type.NUMBER },
+              keywordScore: { type: Type.NUMBER },
+              readabilityScore: { type: Type.NUMBER },
+              aiScore: { type: Type.NUMBER },
+              humanScore: { type: Type.NUMBER },
+            },
+            required: ["seoScore", "keywordScore", "readabilityScore", "aiScore", "humanScore"]
+          }
+        },
+        required: ["title", "content", "metaTitle", "metaDescription", "slug", "metrics"]
+      }
+    }
+  });
+
+  const updatedData = JSON.parse(response.text || "{}");
+  
+  const references = [...currentBlog.references];
+  const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+  if (groundingChunks) {
+    groundingChunks.forEach((chunk: any) => {
+      if (chunk.web?.uri && !references.includes(chunk.web.uri)) {
+        references.push(chunk.web.uri);
+      }
+    });
+  }
+
+  return {
+    ...currentBlog,
+    ...updatedData,
+    references,
+    seoData: {
+      ...currentBlog.seoData,
+      metaTitle: updatedData.metaTitle,
+      metaDescription: updatedData.metaDescription,
+      slug: updatedData.slug,
+    }
+  };
+};
+
 export const extendBlogWithTopic = async (currentBlog: GeneratedBlog, newTopic: string): Promise<GeneratedBlog> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = getAi();
   
   const prompt = `I have a blog about "${currentBlog.title}". Add a section about "${newTopic}".
   STRICT RULE: The final total article word count MUST NOT exceed 550 words.

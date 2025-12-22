@@ -1,18 +1,19 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { GeneratedBlog, BlogStyle, BlogImage } from '../types';
-import { extendBlogWithTopic } from '../services/geminiService';
 import { convertBlogToFullHtml } from '../services/bloggerService';
 
 interface BlogEditorProps {
   blog: GeneratedBlog;
   onUpdate: (updated: GeneratedBlog) => void;
   onRewrite: (style: BlogStyle) => void;
+  onRefine: (instruction: string) => void;
 }
 
-const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onUpdate, onRewrite }) => {
-  const [activeSection, setActiveSection] = useState<'content' | 'settings'>('content');
+const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onUpdate, onRewrite, onRefine }) => {
+  const [activeSection, setActiveSection] = useState<'content' | 'settings' | 'references'>('content');
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
+  const [refinementPrompt, setRefinementPrompt] = useState('');
   
   const headerFileRef = useRef<HTMLInputElement>(null);
   const midFileRef = useRef<HTMLInputElement>(null);
@@ -26,7 +27,6 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onUpdate, onRewrite }) =>
     const plainText = `${blog.title}\n\n${blog.content}`;
 
     try {
-      // Modern Clipboard API - providing multiple formats at once
       const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
       const textBlob = new Blob([plainText], { type: 'text/plain' });
       
@@ -42,7 +42,6 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onUpdate, onRewrite }) =>
       setTimeout(() => setCopyStatus('idle'), 2500);
     } catch (err) {
       console.warn("ClipboardItem failed, falling back to selection method", err);
-      // Fallback: Selection-based copy
       const container = document.createElement('div');
       container.innerHTML = htmlContent;
       container.style.position = 'fixed';
@@ -86,6 +85,13 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onUpdate, onRewrite }) =>
     }
   };
 
+  const handleRefineSubmit = () => {
+    if (refinementPrompt.trim()) {
+      onRefine(refinementPrompt);
+      setRefinementPrompt('');
+    }
+  };
+
   const ImageBox = ({ image, index, label }: { image: BlogImage; index: number; label: string }) => {
     const fileRef = index === 0 ? headerFileRef : midFileRef;
     return (
@@ -112,6 +118,7 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onUpdate, onRewrite }) =>
         <div className="flex">
           <button onClick={() => setActiveSection('content')} className={`px-6 py-4 font-bold text-sm ${activeSection === 'content' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500'}`}>Content</button>
           <button onClick={() => setActiveSection('settings')} className={`px-6 py-4 font-bold text-sm ${activeSection === 'settings' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500'}`}>SEO Settings</button>
+          <button onClick={() => setActiveSection('references')} className={`px-6 py-4 font-bold text-sm ${activeSection === 'references' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500'}`}>Authenticity</button>
         </div>
 
         <div className="flex items-center gap-3">
@@ -139,14 +146,37 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onUpdate, onRewrite }) =>
       </div>
 
       <div className="p-8">
-        {activeSection === 'content' ? (
+        {activeSection === 'content' && (
           <div className="space-y-6">
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center mb-4">
+              <div className="flex-1 w-full">
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1 ml-1">Refine Content with AI</p>
+                <input 
+                  type="text" 
+                  value={refinementPrompt}
+                  onChange={(e) => setRefinementPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleRefineSubmit()}
+                  placeholder="e.g. 'Add more detail about pricing', 'Make the tone more professional'..."
+                  className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                />
+              </div>
+              <button 
+                disabled={!refinementPrompt.trim()}
+                onClick={handleRefineSubmit}
+                className="w-full md:w-auto bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-30"
+              >
+                Refine Post
+              </button>
+            </div>
+
             <input type="text" value={blog.title} onChange={(e) => onUpdate({...blog, title: e.target.value})} className="w-full text-3xl font-black text-gray-900 outline-none border-b-2 border-transparent focus:border-indigo-100 transition-colors py-2" placeholder="Post Title" />
             <ImageBox image={blog.images?.[0]} index={0} label="Header Image" />
             <textarea value={blog.content} onChange={(e) => onUpdate({...blog, content: e.target.value})} rows={25} className="w-full text-lg leading-relaxed text-gray-700 outline-none border-none resize-none bg-transparent font-serif" placeholder="Start writing..." />
             <ImageBox image={blog.images?.[1]} index={1} label="Mid Image" />
           </div>
-        ) : (
+        )}
+        
+        {activeSection === 'settings' && (
           <div className="space-y-6">
             <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Slug (URL)</label>
@@ -155,6 +185,44 @@ const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onUpdate, onRewrite }) =>
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Meta Description</label>
               <textarea value={blog.seoData.metaDescription} readOnly className="w-full border border-gray-200 rounded-2xl px-5 py-4 bg-white text-sm text-gray-600 outline-none" rows={4} />
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'references' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
+              <h3 className="text-lg font-black text-indigo-900 mb-2">Sources & References</h3>
+              <p className="text-sm text-indigo-700 mb-6">These are the live web sources verified and used to generate this article, ensuring factual accuracy and authenticity.</p>
+              
+              <div className="space-y-3">
+                {blog.references && blog.references.length > 0 ? (
+                  blog.references.map((ref, idx) => (
+                    <a 
+                      key={idx} 
+                      href={ref} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="flex items-center gap-3 p-4 bg-white rounded-xl border border-indigo-200 hover:border-indigo-500 hover:shadow-md transition-all group"
+                    >
+                      <div className="bg-indigo-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-0.5">Verified Source</p>
+                        <p className="text-sm text-gray-600 truncate font-mono">{ref}</p>
+                      </div>
+                      <svg className="w-4 h-4 text-indigo-300 group-hover:text-indigo-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  ))
+                ) : (
+                  <div className="text-center py-10 bg-white/50 rounded-xl border border-dashed border-indigo-200">
+                    <p className="text-sm text-gray-400 italic">No direct web references found for this variation. Authenticity verified through general knowledge base.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

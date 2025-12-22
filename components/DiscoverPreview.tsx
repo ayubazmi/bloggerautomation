@@ -4,16 +4,25 @@ import { GeneratedBlog, BlogImage } from '../types';
 
 interface DiscoverPreviewProps {
   blog: GeneratedBlog;
+  onRefine: (instruction: string) => void;
 }
 
-const DiscoverPreview: React.FC<DiscoverPreviewProps> = ({ blog }) => {
+const DiscoverPreview: React.FC<DiscoverPreviewProps> = ({ blog, onRefine }) => {
   const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('mobile');
+  const [refinementPrompt, setRefinementPrompt] = useState('');
 
   // Safety fallback for images
   const headerImage = blog.images?.[0]?.url || 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&q=80&w=1000';
   const midImage = blog.images?.[1]?.url || 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&q=80&w=1000';
   const isHeaderAi = blog.images?.[0]?.isAiGenerated;
   const isMidAi = blog.images?.[1]?.isAiGenerated;
+
+  const handleRefineSubmit = () => {
+    if (refinementPrompt.trim()) {
+      onRefine(refinementPrompt);
+      setRefinementPrompt('');
+    }
+  };
 
   const AiLabel = () => (
     <div className="absolute bottom-2 right-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded text-[7px] font-black text-white uppercase tracking-widest border border-white/20">
@@ -22,7 +31,7 @@ const DiscoverPreview: React.FC<DiscoverPreviewProps> = ({ blog }) => {
   );
 
   return (
-    <div className="flex flex-col items-center w-full animate-fadeIn">
+    <div className="flex flex-col items-center w-full animate-fadeIn pb-24">
       <div className="mb-8 text-center">
         <h2 className="text-3xl font-black text-gray-900 tracking-tight">Content Preview</h2>
         <p className="text-gray-500 mt-1">Visualize how your content adapts across different surfaces</p>
@@ -44,6 +53,27 @@ const DiscoverPreview: React.FC<DiscoverPreviewProps> = ({ blog }) => {
             Desktop Browser
           </button>
         </div>
+      </div>
+
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] w-full max-w-2xl px-4 animate-slideUp">
+         <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 p-4 flex gap-4 items-center ring-4 ring-indigo-50/50">
+           <input 
+             type="text" 
+             value={refinementPrompt}
+             onChange={(e) => setRefinementPrompt(e.target.value)}
+             onKeyDown={(e) => e.key === 'Enter' && handleRefineSubmit()}
+             placeholder="Need changes? Tell AI what to update..."
+             className="flex-1 bg-gray-50 rounded-2xl px-5 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+           />
+           <button 
+             onClick={handleRefineSubmit}
+             disabled={!refinementPrompt.trim()}
+             className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-30 flex items-center gap-2 shadow-lg shadow-indigo-100"
+           >
+             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+             Refine
+           </button>
+         </div>
       </div>
 
       {viewMode === 'mobile' ? (

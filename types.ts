@@ -2,7 +2,7 @@
 export interface TrendingTopic {
   id: string;
   title: string;
-  source: 'Google' | 'Reddit' | 'Twitter' | 'Youtube' | 'News' | '9to5google.com' | 'electrek.co' | '9to5mac.com' | 'english.patrikatimes.in' | 'Google News' | 'NewsBytes' | 'The Verge';
+  source: 'Google' | 'Reddit' | 'Twitter' | 'Youtube' | 'News' | '9to5google.com' | 'electrek.co' | '9to5mac.com' | 'english.patrikatimes.in' | 'Google News' | 'NewsBytes' | 'The Verge' | 'Bing';
   difficulty: 'Easy' | 'Medium' | 'Hard';
   intent: string;
   searchVolume: string;
@@ -24,6 +24,7 @@ export interface GeneratedBlog {
   content: string;
   style: BlogStyle;
   images: BlogImage[];
+  references: string[];
   seoData: {
     metaTitle: string;
     metaDescription: string;
