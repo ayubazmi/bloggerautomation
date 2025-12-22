@@ -197,7 +197,7 @@ export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Pr
         contents: { parts: [{ text: p }] },
         config: { imageConfig: { aspectRatio: "16:9" } }
       });
-      const candidate = imgResp.response.candidates?.[0];
+      const candidate = imgResp.candidates?.[0];
 
 const part = candidate?.content?.parts?.find(
   (p: any) => p.inlineData?.data
