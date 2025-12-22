@@ -197,10 +197,18 @@ export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Pr
         contents: { parts: [{ text: p }] },
         config: { imageConfig: { aspectRatio: "16:9" } }
       });
-      const part = imgResp.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-      if (part?.inlineData) {
-        images.push({ url: `data:image/png;base64,${part.inlineData.data}`, isAiGenerated: true });
-      }
+      const candidate = imgResp.response.candidates?.[0];
+
+const part = candidate?.content?.parts?.find(
+  (p: any) => p.inlineData?.data
+);
+
+if (part?.inlineData?.data) {
+  images.push({
+    url: `data:image/png;base64,${part.inlineData.data}`,
+    isAiGenerated: true
+  });
+}
     } catch (e) {
       console.error("Image generation failed", e);
     }
