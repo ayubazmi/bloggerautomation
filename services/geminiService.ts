@@ -2,11 +2,39 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { TrendingTopic, GeneratedBlog, BlogStyle, BlogImage } from "../types";
 
-// Always initialize GoogleGenAI with the apiKey in a named parameter using process.env.API_KEY
-const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+let cachedApiKey: string | null = null;
+
+/**
+ * Fetches the API key from the backend if not already cached.
+ */
+async function getEffectiveApiKey(): Promise<string> {
+  if (cachedApiKey) return cachedApiKey;
+  
+  // First check if it's injected via build process
+  if (process.env.API_KEY) {
+    cachedApiKey = process.env.API_KEY;
+    return cachedApiKey;
+  }
+
+  // Fallback: Fetch from the backend config endpoint
+  try {
+    const response = await fetch('/api/config');
+    const data = await response.json();
+    cachedApiKey = data.apiKey;
+    return cachedApiKey || '';
+  } catch (error) {
+    console.error("Failed to fetch API key from backend", error);
+    return '';
+  }
+}
+
+const getAi = async () => {
+  const apiKey = await getEffectiveApiKey();
+  return new GoogleGenAI({ apiKey });
+};
 
 export const getTrendingTopics = async (category: string = 'General', keyword?: string): Promise<TrendingTopic[]> => {
-  const ai = getAi();
+  const ai = await getAi();
   const now = new Date();
   const currentDate = now.toLocaleDateString('en-US', { 
     weekday: 'long', 
@@ -68,7 +96,7 @@ export const getTrendingTopics = async (category: string = 'General', keyword?: 
 };
 
 export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Promise<GeneratedBlog> => {
-  const ai = getAi();
+  const ai = await getAi();
   
   const styleInstructions: Record<BlogStyle, string> = {
     'News': 'Write as a factual, breaking news report. Objective tone.',
@@ -198,7 +226,7 @@ export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Pr
 };
 
 export const refineBlogWithPrompt = async (currentBlog: GeneratedBlog, userInstruction: string): Promise<GeneratedBlog> => {
-  const ai = getAi();
+  const ai = await getAi();
   
   const prompt = `Act as an expert editor. I have an existing blog post about "${currentBlog.title}". 
   The user wants to refine it with the following instruction: "${userInstruction}".
@@ -272,7 +300,7 @@ export const refineBlogWithPrompt = async (currentBlog: GeneratedBlog, userInstr
 };
 
 export const extendBlogWithTopic = async (currentBlog: GeneratedBlog, newTopic: string): Promise<GeneratedBlog> => {
-  const ai = getAi();
+  const ai = await getAi();
   
   const prompt = `I have a blog about "${currentBlog.title}". Add a section about "${newTopic}".
   STRICT RULE: The final total article word count MUST NOT exceed 550 words.
