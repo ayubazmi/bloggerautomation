@@ -2,45 +2,11 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { TrendingTopic, GeneratedBlog, BlogStyle, BlogImage } from "../types";
 
-let cachedApiKey: string | null = null;
-
-/**
- * Fetches the API key from the backend if not already cached.
- */
-async function getEffectiveApiKey(): Promise<string> {
-  if (cachedApiKey) return cachedApiKey;
-
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
-
-  if (typeof key === 'string' && key.length > 0) {
-    cachedApiKey = key;
-    return key;
-  }
-
-  console.error("Gemini API key is missing");
-  return '';
-}
-
-
-  // Fallback: Fetch from the backend config endpoint
-  try {
-    const response = await fetch('/api/config');
-    const data = await response.json();
-    cachedApiKey = data.apiKey;
-    return cachedApiKey || '';
-  } catch (error) {
-    console.error("Failed to fetch API key from backend", error);
-    return '';
-  }
-}
-
-const getAi = async () => {
-  const apiKey = await getEffectiveApiKey();
-  return new GoogleGenAI({ apiKey });
-};
+// Always initialize GoogleGenAI with the apiKey in a named parameter using process.env.API_KEY
+const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getTrendingTopics = async (category: string = 'General', keyword?: string): Promise<TrendingTopic[]> => {
-  const ai = await getAi();
+  const ai = getAi();
   const now = new Date();
   const currentDate = now.toLocaleDateString('en-US', { 
     weekday: 'long', 
@@ -102,7 +68,7 @@ export const getTrendingTopics = async (category: string = 'General', keyword?: 
 };
 
 export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Promise<GeneratedBlog> => {
-  const ai = await getAi();
+  const ai = getAi();
   
   const styleInstructions: Record<BlogStyle, string> = {
     'News': 'Write as a factual, breaking news report. Objective tone.',
@@ -203,18 +169,10 @@ export const generateBlogWithStyle = async (topic: string, style: BlogStyle): Pr
         contents: { parts: [{ text: p }] },
         config: { imageConfig: { aspectRatio: "16:9" } }
       });
-      const candidate = imgResp.candidates?.[0];
-
-const part = candidate?.content?.parts?.find(
-  (p: any) => p.inlineData?.data
-);
-
-if (part?.inlineData?.data) {
-  images.push({
-    url: `data:image/png;base64,${part.inlineData.data}`,
-    isAiGenerated: true
-  });
-}
+      const part = imgResp.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+      if (part?.inlineData) {
+        images.push({ url: `data:image/png;base64,${part.inlineData.data}`, isAiGenerated: true });
+      }
     } catch (e) {
       console.error("Image generation failed", e);
     }
@@ -240,7 +198,7 @@ if (part?.inlineData?.data) {
 };
 
 export const refineBlogWithPrompt = async (currentBlog: GeneratedBlog, userInstruction: string): Promise<GeneratedBlog> => {
-  const ai = await getAi();
+  const ai = getAi();
   
   const prompt = `Act as an expert editor. I have an existing blog post about "${currentBlog.title}". 
   The user wants to refine it with the following instruction: "${userInstruction}".
@@ -314,7 +272,7 @@ export const refineBlogWithPrompt = async (currentBlog: GeneratedBlog, userInstr
 };
 
 export const extendBlogWithTopic = async (currentBlog: GeneratedBlog, newTopic: string): Promise<GeneratedBlog> => {
-  const ai = await getAi();
+  const ai = getAi();
   
   const prompt = `I have a blog about "${currentBlog.title}". Add a section about "${newTopic}".
   STRICT RULE: The final total article word count MUST NOT exceed 550 words.
