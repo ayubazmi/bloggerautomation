@@ -1,4 +1,3 @@
-
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
@@ -11,23 +10,36 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+app.use(express.json());
+
+// Serve frontend
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Endpoint for frontend to retrieve config/api key
-app.get('/api/config', (req, res) => {
-  res.json({
-    apiKey: process.env.API_KEY || ''
-  });
+/*
+ ❌ REMOVED:
+ /api/config
+ Never send API keys to frontend
+*/
+
+// Example secure API endpoint
+app.post('/api/gemini', async (req, res) => {
+  try {
+    // Here you call Gemini using process.env.GEMINI_API_KEY
+    // Frontend NEVER sees the key
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Gemini error' });
+  }
 });
 
-// SPA routing fallback
+// SPA fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  if (!process.env.API_KEY) {
-    console.warn("CRITICAL: API_KEY environment variable is not set!");
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn("CRITICAL: GEMINI_API_KEY not set!");
   }
 });
