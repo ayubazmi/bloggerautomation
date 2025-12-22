@@ -9,12 +9,18 @@ let cachedApiKey: string | null = null;
  */
 async function getEffectiveApiKey(): Promise<string> {
   if (cachedApiKey) return cachedApiKey;
-  
-  // First check if it's injected via build process
-  if (import.meta.env.VITE_GEMINI_API_KEY) {
-  cachedApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  return cachedApiKey;
+
+  const key = import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (typeof key === 'string' && key.length > 0) {
+    cachedApiKey = key;
+    return key;
   }
+
+  console.error("Gemini API key is missing");
+  return '';
+}
+
 
   // Fallback: Fetch from the backend config endpoint
   try {
