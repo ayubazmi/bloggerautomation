@@ -11,9 +11,9 @@ async function getEffectiveApiKey(): Promise<string> {
   if (cachedApiKey) return cachedApiKey;
   
   // First check if it's injected via build process
-  if (process.env.API_KEY) {
-    cachedApiKey = process.env.API_KEY;
-    return cachedApiKey;
+  if (import.meta.env.VITE_GEMINI_API_KEY) {
+  cachedApiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  return cachedApiKey;
   }
 
   // Fallback: Fetch from the backend config endpoint
